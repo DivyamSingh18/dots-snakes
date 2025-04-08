@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Parallax Particle Background</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #fdfdfd, #f0f0f0, #ffffff);
+      background-size: 400% 400%;
+      animation: gradientShift 20s ease infinite;
+    }
+
+    @keyframes gradientShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+      pointer-events: none;
+    }
+
+    #bgLayer { z-index: 0; }
+    #fgLayer { z-index: 1; }
+    #orbitLayer { z-index: 2; }
+    #snakeLayer { z-index: 3; }
+  </style>
+</head>
+<body>
+  <canvas id="bgLayer"></canvas>
+  <canvas id="fgLayer"></canvas>
+  <canvas id="orbitLayer"></canvas>
+  <canvas id="snakeLayer"></canvas>
+
+  <script>
+    const bgCanvas = document.getElementById('bgLayer');
+    const fgCanvas = document.getElementById('fgLayer');
+    const orbitCanvas = document.getElementById('orbitLayer');
+    const snakeCanvas = document.getElementById('snakeLayer');
+
+    const bgCtx = bgCanvas.getContext('2d');
+    const fgCtx = fgCanvas.getContext('2d');
+    const orbitCtx = orbitCanvas.getContext('2d');
+    const snakeCtx = snakeCanvas.getContext('2d');
+
+    let bgParticles = [], fgParticles = [], orbiters = [], snakes = [];
+    const snakeColors = ['#00C878', '#FF6F61', '#FFD700', '#1E90FF', '#9B59B6', '#2ECC71', '#F39C12'];
+
+    function resizeCanvas() {
+      [bgCanvas, fgCanvas, orbitCanvas, snakeCanvas].forEach(c => {
+        c.width = window.innerWidth;
+        c.height = window.innerHeight;
+      });
+    }
+
+    window.addEventListener('resize', () => {
+      resizeCanvas();
+      initParticles();
+      initOrbiters();
+    });
+
+    class Particle {
+      constructor(depth = 'bg') {
+        this.canvas = depth === 'bg' ? bgCanvas : fgCanvas;
+        this.ctx = depth === 'bg' ? bgCtx : fgCtx;
+        this.depth = depth;
+        this.speedMultiplier = depth === 'bg' ? 0.3 : 0.6;
+        this.sizeMultiplier = depth === 'bg' ? 1 : 1.6;
+        this.reset();
+      }
+
+      reset() {
+        this.x = Math.random() * this.canvas.width;
+        this.y = Math.random() * this.canvas.height;
+        this.size = (Math.random() * 1.5 + 0.5) * this.sizeMultiplier;
+        this.speedX = (Math.random() - 0.5) * this.speedMultiplier;
+        this.speedY = (Math.random() - 0.5) * this.speedMultiplier;
+        this.opacity = Math.random() * 0.4 + 0.2;
+      }
+
+      update() {
+        this.x += this.speedX;
+        this.y += this.speedY;
+        if (this.x < 0 || this.x > this.canvas.width || this.y < 0 || this.y > this.canvas.height) {
+          this.reset();
+        }
+      }
+
+      draw() {
+        this.ctx.beginPath();
+        this.ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        this.ctx.fillStyle = `rgba(140, 170, 255, ${this.opacity})`;
+        this.ctx.shadowColor = `rgba(140, 170, 255, ${this.opacity})`;
+        this.ctx.shadowBlur = 8;
+        this.ctx.fill();
+        this.ctx.shadowBlur = 0;
+      }
+    }
+
+    class Orbiter {
+      constructor() {
+        this.centerX = Math.random() * orbitCanvas.width;
+        this.centerY = Math.random() * orbitCanvas.height;
+        this.radius = Math.random() * 40 + 30;
+        this.angle = Math.random() * Math.PI * 2;
+        this.speed = 0.01 + Math.random() * 0.01;
+        this.size = Math.random() * 2 + 1;
+        this.opacity = 0.3 + Math.random() * 0.4;
+      }
+
+      update() {
+        this.angle += this.speed;
+      }
+
+      draw(ctx) {
+        const x = this.centerX + Math.cos(this.angle) * this.radius;
+        const y = this.centerY + Math.sin(this.angle) * this.radius;
+
+        ctx.beginPath();
+        ctx.arc(x, y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 150, 150, ${this.opacity})`;
+        ctx.shadowColor = `rgba(255, 100, 100, ${this.opacity})`;
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+    }
+
+    function initParticles() {
+      bgParticles = [], fgParticles = [];
+      for (let i = 0; i < 60; i++) bgParticles.push(new Particle('bg'));
+      for (let i = 0; i < 100; i++) fgParticles.push(new Particle('fg'));
+    }
+
+    function initOrbiters() {
+      orbiters = [];
+      for (let i = 0; i < 30; i++) orbiters.push(new Orbiter());
+    }
+
+    function updateSnakes() {
+      if (snakes.length === 0) {
+        for (let i = 0; i < 8; i++) {
+          snakes.push({
+            body: [{ x: Math.random() * snakeCanvas.width, y: Math.random() * snakeCanvas.height }],
+            color: snakeColors[i % snakeColors.length],
+            target: null
+          });
+        }
+      }
+
+      snakes.forEach(snake => {
+        const head = snake.body[0];
+        let closest = null;
+        let closestDist = Infinity;
+
+        fgParticles.forEach(p => {
+          const dx = head.x - p.x;
+          const dy = head.y - p.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < closestDist) {
+            closestDist = dist;
+            closest = p;
+          }
+        });
+
+        if (closest && closestDist < 10) {
+          fgParticles.splice(fgParticles.indexOf(closest), 1);
+        } else if (closest) {
+          const dx = closest.x - head.x;
+          const dy = closest.y - head.y;
+          const step = 1.2;
+          const angle = Math.atan2(dy, dx);
+          const newX = head.x + Math.cos(angle) * step;
+          const newY = head.y + Math.sin(angle) * step;
+
+          snake.body.unshift({ x: newX, y: newY });
+          if (snake.body.length > 40) snake.body.pop();
+        }
+      });
+    }
+
+    function drawSnakes() {
+      snakeCtx.clearRect(0, 0, snakeCanvas.width, snakeCanvas.height);
+      snakes.forEach(snake => {
+        for (let i = 0; i < snake.body.length; i++) {
+          const s = snake.body[i];
+          snakeCtx.beginPath();
+          snakeCtx.arc(s.x, s.y, 4, 0, Math.PI * 2);
+          snakeCtx.fillStyle = `${snake.color}`;
+          snakeCtx.globalAlpha = 1 - i / snake.body.length;
+          snakeCtx.fill();
+        }
+      });
+      snakeCtx.globalAlpha = 1;
+    }
+
+    function animateParticles() {
+      bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
+      fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
+      orbitCtx.clearRect(0, 0, orbitCanvas.width, orbitCanvas.height);
+
+      bgParticles.forEach(p => { p.update(); p.draw(); });
+      fgParticles.forEach(p => { p.update(); p.draw(); });
+      orbiters.forEach(o => { o.update(); o.draw(orbitCtx); });
+
+      updateSnakes();
+      drawSnakes();
+
+      requestAnimationFrame(animateParticles);
+    }
+
+    resizeCanvas();
+    initParticles();
+    initOrbiters();
+    animateParticles();
+  </script>
+</body>
+</html>
