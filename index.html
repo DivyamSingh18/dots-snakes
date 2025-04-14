@@ -35,6 +35,7 @@
     #fgLayer { z-index: 1; }
     #orbitLayer { z-index: 2; }
     #snakeLayer { z-index: 3; }
+    #cometLayer { z-index: 4; }
   </style>
 </head>
 <body>
@@ -42,23 +43,25 @@
   <canvas id="fgLayer"></canvas>
   <canvas id="orbitLayer"></canvas>
   <canvas id="snakeLayer"></canvas>
+  <canvas id="cometLayer"></canvas>
 
   <script>
     const bgCanvas = document.getElementById('bgLayer');
     const fgCanvas = document.getElementById('fgLayer');
     const orbitCanvas = document.getElementById('orbitLayer');
     const snakeCanvas = document.getElementById('snakeLayer');
+    const cometCanvas = document.getElementById('cometLayer');
 
     const bgCtx = bgCanvas.getContext('2d');
     const fgCtx = fgCanvas.getContext('2d');
     const orbitCtx = orbitCanvas.getContext('2d');
     const snakeCtx = snakeCanvas.getContext('2d');
+    const cometCtx = cometCanvas.getContext('2d');
 
-    let bgParticles = [], fgParticles = [], orbiters = [], snakes = [];
-    const snakeColors = ['#00C878', '#FF6F61', '#FFD700', '#1E90FF', '#9B59B6', '#2ECC71', '#F39C12'];
+    let bgParticles = [], fgParticles = [], orbiters = [], snakes = [], comets = [];
 
     function resizeCanvas() {
-      [bgCanvas, fgCanvas, orbitCanvas, snakeCanvas].forEach(c => {
+      [bgCanvas, fgCanvas, orbitCanvas, snakeCanvas, cometCanvas].forEach(c => {
         c.width = window.innerWidth;
         c.height = window.innerHeight;
       });
@@ -70,20 +73,20 @@
       initOrbiters();
     });
 
-    class Particle {
-      constructor(depth = 'bg') {
-        this.canvas = depth === 'bg' ? bgCanvas : fgCanvas;
-        this.ctx = depth === 'bg' ? bgCtx : fgCtx;
-        this.depth = depth;
-        this.speedMultiplier = depth === 'bg' ? 0.3 : 0.6;
-        this.sizeMultiplier = depth === 'bg' ? 1 : 1.6;
-        this.reset();
+    class Comet {
+      constructor() {
+        this.startTime = performance.now();
+        this.path = [];
+        this.maxTrail = 80;
+        this.opacity = 1;
+        this.speed = 0.0025;
+        this.done = false;
       }
 
-      reset() {
-        this.x = Math.random() * this.canvas.width;
-        this.y = Math.random() * this.canvas.height;
-        this.size = (Math.random() * 1.5 + 0.5) * this.sizeMultiplier;
+      getPosition(t) {
+        const w = cometCanvas.width;
+        const h = cometCanvas.height;
+        const x = w - t * w; // right to center
         this.speedX = (Math.random() - 0.5) * this.speedMultiplier;
         this.speedY = (Math.random() - 0.5) * this.speedMultiplier;
         this.opacity = Math.random() * 0.4 + 0.2;
@@ -150,9 +153,8 @@
 
     function updateSnakes() {
       if (snakes.length === 0) {
-        const spacing = 50;
-        for (let i = 0; i < 8; i++) {
-          const angle = (i / 8) * Math.PI * 2;
+        for (let i = 0; i < snakeColors.length; i++) {
+          const angle = (i / snakeColors.length) * Math.PI * 2;
           const radius = 100 + Math.random() * 100;
           const x = snakeCanvas.width / 2 + Math.cos(angle) * radius + Math.random() * 20;
           const y = snakeCanvas.height / 2 + Math.sin(angle) * radius + Math.random() * 20;
@@ -239,7 +241,6 @@
 
       updateSnakes();
       drawSnakes();
-
       respawnFgParticles();
 
       requestAnimationFrame(animateParticles);
