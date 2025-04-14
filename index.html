@@ -150,16 +150,21 @@
 
     function updateSnakes() {
       if (snakes.length === 0) {
+        const spacing = 50;
         for (let i = 0; i < 8; i++) {
+          const angle = (i / 8) * Math.PI * 2;
+          const radius = 100 + Math.random() * 100;
+          const x = snakeCanvas.width / 2 + Math.cos(angle) * radius + Math.random() * 20;
+          const y = snakeCanvas.height / 2 + Math.sin(angle) * radius + Math.random() * 20;
           snakes.push({
-            body: [{ x: Math.random() * snakeCanvas.width, y: Math.random() * snakeCanvas.height }],
+            body: [{ x, y }],
             color: snakeColors[i % snakeColors.length],
             target: null
           });
         }
       }
 
-      snakes.forEach(snake => {
+      snakes.forEach((snake, index) => {
         const head = snake.body[0];
         let closest = null;
         let closestDist = Infinity;
@@ -179,13 +184,23 @@
         } else if (closest) {
           const dx = closest.x - head.x;
           const dy = closest.y - head.y;
-          const step = 1.2;
+          const step = 0.5;
           const angle = Math.atan2(dy, dx);
           const newX = head.x + Math.cos(angle) * step;
           const newY = head.y + Math.sin(angle) * step;
 
-          snake.body.unshift({ x: newX, y: newY });
-          if (snake.body.length > 40) snake.body.pop();
+          let overlap = snakes.some((other, i) => {
+            if (i === index) return false;
+            return other.body.some(segment => {
+              const d = Math.hypot(segment.x - newX, segment.y - newY);
+              return d < 8;
+            });
+          });
+
+          if (!overlap) {
+            snake.body.unshift({ x: newX, y: newY });
+            if (snake.body.length > 100) snake.body.pop();
+          }
         }
       });
     }
@@ -205,6 +220,14 @@
       snakeCtx.globalAlpha = 1;
     }
 
+    function respawnFgParticles() {
+      const targetCount = 100;
+      const currentCount = fgParticles.length;
+      for (let i = 0; i < targetCount - currentCount; i++) {
+        fgParticles.push(new Particle('fg'));
+      }
+    }
+
     function animateParticles() {
       bgCtx.clearRect(0, 0, bgCanvas.width, bgCanvas.height);
       fgCtx.clearRect(0, 0, fgCanvas.width, fgCanvas.height);
@@ -216,6 +239,8 @@
 
       updateSnakes();
       drawSnakes();
+
+      respawnFgParticles();
 
       requestAnimationFrame(animateParticles);
     }
